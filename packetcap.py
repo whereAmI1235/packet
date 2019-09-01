@@ -1,22 +1,6 @@
 
 ''.join([chr(int(x,2)) for x in ethli[0][1].data.src]).decode('utf-8')        
 
-
-import dpkt
-
-f = open('c:\\users\\aroffee\desktop\\tvp_8_19.pcap','rb')
-def grabpackets(fileLocation):
-    f = open(fileLocation,'rb')
-    pcap = dpkt.pcap.Reader(f)
-    ethli = []
-    for ts, buf in pcap:
-        ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
-    return ethli
-    
-
-ip = eth.data
-tcp = ip.data
-
 #Get all Source IPs
 for x in ethli:
     logger("Source IP: " +'.'.join(str(y) for y in x[1].data.src))
@@ -54,8 +38,6 @@ for x,y in enumerate(ethli):
     logger(str(x)+' '+str(flags.getflags()),end=' ')
     logger(bin(flags.getbits()))    
 
-def getflag()
-
 with open('c:\\users\\aroffee\\desktop\\sessionflags.txt','w') as flag:
     for x,y in enumerate(ethli):
         flags = TCP_FLAGS(ethli[x][1].data.data.flags)
@@ -68,12 +50,6 @@ with open('c:\\users\\aroffee\\desktop\\sessionflags.txt','w') as flag:
 
 '.'.join([str(x) for x in ethli[0][1].data.dst])
 
-def decode(input):
-    for x in input:
-        try:
-            x.decode('hex')
-        except:
-            logger.''
 
 #Epoch time calculation (just going to do per interval)
 
@@ -82,71 +58,6 @@ January 1, 1970, 00:00:00 UTC
 #packetcap.py
 
 '''
-End of tcp conversation ['FIN','PSH','ACK']
-
-the sequence number of the ACK is the 
-the ACK is +1 of the sending sequence number
-[SYN] flag shows a new session
-[SYN,ACK]
-
-if see a syn this is a new session
-
-otherwise it is an 
-sample, this is a GRE packet_tup, each layer to peel back is another.data
-Ethernet(dst=b'\xb0&\x80&\xa8\xc6', src=b'\x84=\xc6\x81\xcf\xc1', type=33024, 
-vlan_tags=[VLANtag8021Q(pri=0, cfi=0, id=1200)], vlanid=1200, priority=0, cfi=0, data=IP(len=76, id=55026, 
-ttl=255, p=47, sum=50514, src=b'\n\xa0\x02\t', dst=b'\n\xa0\x07\xf5', opts=b'', 
-data=GRE(data=IP(len=52, id=10663, ttl=57, p=6, sum=47055, src=b'9\x0c\xf2\x8d', dst=b'\xd8q\x9cB', opts=b''
-, data=TCP(sport=28600, dport=80, seq=2731555559, ack=2302139443, off=8, flags=24, sum=24576, 
-opts=b'\x01\x01\x08\nI\xd9\x01E\x91-\xe6\xef')))))
-
->>> packets[0][1].data.data.data.data.seq
-2731555559
-
-
-def seedata(pac):
- logger(pac.data)
- try:
-  seedata(pac.data)
- except:
-  pass
-
-def seedata1(pac):
-    logger(pac.__repr__())
-    try:
-        seedata(pac.data)
-    except:
-        pass
-
-pac.__repr__(), see all information as a string
-
-57 -> 216
-Seq             Ack
-2968152311 SYN
-2968152312 3915628781 ACK
-2968152312 3915628781 HTTP POST
-2968155208 3915628781 TCP previous segment not captured, Continuation or non HTTP traffic
-2968153760 3915628781 TCP out of order
-2968155474 3915631677 Acked unseen PSH ACK
-2968155474 3915633125 Acked unseen PSH ACK
-2968155474 3915634573 PSH ACK
-2968155474 3915636021 PSH ACK
-2968155474 3915638311 PSH ACK
-2968155474 3915638311 FIN PSH ACK
-2968155474 3915638312 PSH ACK
-
-test instance
-isinstance(packets[0][1],dpkt.ethernet.Ethernet)
-
-packets1 is a newly read pacp file
-for x,packet_tup in enumerate(packets1):
- try:
-  if TCP_FLAGS(getvalue(packet_tup[1],'TCP','flags')).flagname == ['SYN','ACK']:
-   logger("Found an syn ack packet_tup, its number is: "+str(x)+' sequence number is : '+str(getprotolayer(packet_tup[1],reverseindex(getprotocols(packet_tup[1]),'TCP')).seq))
- except:
-  pass
-
-#if TCP_FLAGS(getprotolayer(packet_tup[1],reverseindex(getprotocols(packet_tup[1]),'TCP')).flags).flagname == ['SYN','ACK']:  
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -271,30 +182,6 @@ class TCP_FLAGS:
         return self.bits
 
 
-'''
-class TCP_SESSION:
-    def __init__(self,session_packets,packet_tup):
-        self.sourceIP =  #source
-        self.destIP =   #dest
-        self.packets =      #associate packet_tup numbers with session.
-
-
-I want each TCP session to hold a reference for all the packets associated with it, therefore I should be
-able to call on this session object and see all the data for the packets in the session and therefore
-troubleshoot by session.
-
-#returns readable mac address from packet_tup.src when packet_tup is of type pkt.ethernet.Ethernet
-def getMAC(bytesin):
-    return ':'.join([bytesin.hex()[i:i+2] for i in range(0,len(bytesin.hex()),2)])
-
-
-def getTCPSession(packets):
-    sessions = []
-    for packet_tup in packets:
-        TCP_SESSION()
-'''
-
-
 #fileLocation = 'c:\\users\\aroffee\desktop\\tvp_8_19.pcap'
 def grabpackets(fileLocation):
     f = open(fileLocation,'rb')
@@ -350,10 +237,8 @@ def getflagcounts(flagtype, packets, interval):
 
 '''
 Method to parse tcp streams.
-
 @see getvalue()
 
-break is only going to break the immediate loop
 '''  
 
 #return an ordered list of tcp converstation, correlated by an dictionary, ordered by packet_tup no.
@@ -417,10 +302,6 @@ def logger(string):
     with open('/Users/acroffee/Roffee/git/packet/log.txt','a+') as log:
         log.write(string+'\n')
 
-def cleanlog():
-    
-
-see results
 def debugconv(sessiondb, end):
     count = 0
     for key in sessiondb:
@@ -458,46 +339,3 @@ def main():
 
 
 
-def findtcpconversations-old(packets):
-    #breakpoint()
-    sessiondb={}
-    stop = 0
-    for x,packet_tup in enumerate(packets):
-        curr_seq, curr_ack = getvalue(packet_tup[1], 'TCP', 'seq'),getvalue(packet_tup[1], 'TCP', 'ack')
-        stop = 0
-        #1 if not tcp then pass the packet_tup
-        if 'TCP' not in getprotocols(packet_tup[1]):
-            stop = 1
-        #2 if the packet_tup is a SYN packet_tup(only), make a !!new session
-        elif TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN']:
-            stop = 2
-            sessiondb[(curr_seq,curr_ack)] = [packet_tup]
-            logger(str("Database length after run SYN only "+str(x)+": "+str(len(sessiondb[curr_seq, curr_ack]))))
-        #3 otherwise compare seq, ack to the keys already in sessiondb
-        else:
-            for keys in sessiondb:
-                logger(keys)
-                #if there are matching sequence or ack numbers
-                if curr_seq in keys or curr_ack in keys:
-                    sessiondb[(curr_seq,curr_ack)] = sessiondb.pop(keys)
-                    sessiondb[(curr_seq,curr_ack)].append(packet_tup)
-                    stop = 3
-                    break
-                #if the curr_seq or curr_ack is +1 of a current key pair
-                elif curr_seq-1 in keys or curr_ack-1 in keys:
-                    sessiondb[(curr_seq,curr_ack)] = sessiondb.pop(keys)
-                    sessiondb[(curr_seq,curr_ack)].append(packet_tup)
-                    stop = 4
-                    break
-                #otherwise we are in the middle of the conversation and we make a new one.
-                else:
-                    sessiondb[curr_seq, curr_ack] = [packet_tup]
-                    stop = 5
-                    break
-            logger(str("Database length after run "+str(x)+": "+str(len(sessiondb[curr_seq, curr_ack]))))
-        logger("stop: "+str(stop))
-    return sessiondb
-
-
-
-dict[newkey] = dict[oldkey]
