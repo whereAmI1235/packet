@@ -19,21 +19,21 @@ tcp = ip.data
 
 #Get all Source IPs
 for x in ethli:
-    print("Source IP: " +'.'.join(str(y) for y in x[1].data.src))
+    logger("Source IP: " +'.'.join(str(y) for y in x[1].data.src))
     #return '.'.join(str(y) for y in x[1].data.src)
 
 #Get Destination IPs
 for x in ethli:
-    print("Source IP: " +'.'.join(str(y) for y in x[1].data.dst))
+    logger("Source IP: " +'.'.join(str(y) for y in x[1].data.dst))
     #return '.'.join(str(y) for y in x[1].data.dst
 
 #Get Source ports
 for x in ethli:
-    print(x[1].data.data.sport)
+    logger(x[1].data.data.sport)
 
 #Get Destination Ports
 for x in ethli:
-    print(x[1].data.data.dport)
+    logger(x[1].data.data.dport)
 
 tcp.sport
 tcp.dport
@@ -43,16 +43,16 @@ for x,y in enumerate(ethli):
     try:
         flags = TCP_FLAGS(ethli[x][1].data.data.flags)
     except:
-        print('',end='')
+        logger('',end='')
     finally:
         if len(bin(ethli[x][1].data.data.flags))<5:
-            print(str(x)+' '+str(flags.getflags()),end=' ')
-            print(bin(flags.getbits()))  
+            logger(str(x)+' '+str(flags.getflags()),end=' ')
+            logger(bin(flags.getbits()))  
 
 for x,y in enumerate(ethli):
     flags = TCP_FLAGS(ethli[x][1].data.data.flags)
-    print(str(x)+' '+str(flags.getflags()),end=' ')
-    print(bin(flags.getbits()))    
+    logger(str(x)+' '+str(flags.getflags()),end=' ')
+    logger(bin(flags.getbits()))    
 
 def getflag()
 
@@ -73,7 +73,7 @@ def decode(input):
         try:
             x.decode('hex')
         except:
-            print.''
+            logger.''
 
 #Epoch time calculation (just going to do per interval)
 
@@ -105,14 +105,14 @@ opts=b'\x01\x01\x08\nI\xd9\x01E\x91-\xe6\xef')))))
 
 
 def seedata(pac):
- print(pac.data)
+ logger(pac.data)
  try:
   seedata(pac.data)
  except:
   pass
 
 def seedata1(pac):
-    print(pac.__repr__())
+    logger(pac.__repr__())
     try:
         seedata(pac.data)
     except:
@@ -142,7 +142,7 @@ packets1 is a newly read pacp file
 for x,packet_tup in enumerate(packets1):
  try:
   if TCP_FLAGS(getvalue(packet_tup[1],'TCP','flags')).flagname == ['SYN','ACK']:
-   print("Found an syn ack packet_tup, its number is: "+str(x)+' sequence number is : '+str(getprotolayer(packet_tup[1],reverseindex(getprotocols(packet_tup[1]),'TCP')).seq))
+   logger("Found an syn ack packet_tup, its number is: "+str(x)+' sequence number is : '+str(getprotolayer(packet_tup[1],reverseindex(getprotocols(packet_tup[1]),'TCP')).seq))
  except:
   pass
 
@@ -270,11 +270,6 @@ class TCP_FLAGS:
     def getbits(self,):
         return self.bits
 
-#returns readable mac address from packet_tup.src when packet_tup is of type pkt.ethernet.Ethernet
-def getMAC(bytesin):
-    return ':'.join([bytesin.hex()[i:i+2] for i in range(0,len(bytesin.hex()),2)])
-
-
 
 '''
 class TCP_SESSION:
@@ -287,12 +282,18 @@ class TCP_SESSION:
 I want each TCP session to hold a reference for all the packets associated with it, therefore I should be
 able to call on this session object and see all the data for the packets in the session and therefore
 troubleshoot by session.
-'''
+
+#returns readable mac address from packet_tup.src when packet_tup is of type pkt.ethernet.Ethernet
+def getMAC(bytesin):
+    return ':'.join([bytesin.hex()[i:i+2] for i in range(0,len(bytesin.hex()),2)])
+
 
 def getTCPSession(packets):
     sessions = []
     for packet_tup in packets:
         TCP_SESSION()
+'''
+
 
 #fileLocation = 'c:\\users\\aroffee\desktop\\tvp_8_19.pcap'
 def grabpackets(fileLocation):
@@ -353,70 +354,80 @@ Method to parse tcp streams.
 @see getvalue()
 
 break is only going to break the immediate loop
-'''
+'''  
 
 #return an ordered list of tcp converstation, correlated by an dictionary, ordered by packet_tup no.
 #packets are numbered already (packet_tup number, packet_tup data)
-def findtcpconversations(packets):
+def findtcpconversations(packets,logging = False):
     sessiondb={}
-    starting=[] #for sessions waiting for ack session[(seq,ack)]
-    try:
-        for x,packet_tup in enumerate(packets):
+    stop = 0
+    for x,packet_tup in enumerate(packets):
+    #breakpoint()
+        try:
             stop = 0
-            #1 if not tcp then pass the packet_tup up
+            #1 if not tcp then pass the packet_tup
             if 'TCP' not in getprotocols(packet_tup[1]):
                 stop = 1
                 continue
+            curr_seq, curr_ack = getvalue(packet_tup[1], 'TCP', 'seq'),getvalue(packet_tup[1], 'TCP', 'ack')
             #2 if the packet_tup is a SYN packet_tup(only), make a !!new session
-            elif TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN']:
-                starting.append(packet_tup)
-                continue
+            if TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN']:
                 stop = 2
-            #if its a syn ack, try to find the conversation that was started in starting, if not SYN probably before capture
-            elif TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN','ACK']:
-                seq,ack = getvalue(packet_tup[1], 'TCP', 'seq'),getvalue(packet_tup[1], 'TCP', 'ack')
-                for start in starting:  
-                    if getvalue(packet_tup[1],'TCP','ack')-1 == getvalue(start[1],'TCP','seq'):
-                        sessiondb[(getvalue(start[1],'TCP','seq'),getvalue(start[1],'TCP','ack'))]=[start,packet_tup]
-                        break                            
+                sessiondb[(curr_seq,curr_ack)] = [packet_tup]
+                if logging:
+                    logger("Packet #"+str(x)+"\n"+str(sessiondb[(curr_seq,curr_ack)])+'\n\n')
                 continue
-                stop = 3
-            #if syn ack but there is no matching syn packet_tup in starting
-            elif TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN','ACK']:
-                sessiondb[(getvalue(packet_tup[1],'TCP','seq'),getvalue(packet_tup[1],'TCP','ack'))] = [packet_tup]
-                continue
-                stop = 4
-            #        
-            else:
-                #get the sequence and ack number for the current packet_tup
-                seq,ack = getvalue(packet_tup[1],'TCP','seq'),getvalue(packet_tup[1],'TCP','ack')
-                #compare it to all the other packets, add it to the appropriate conversation in the dictionary sessiondb
+            #3 otherwise compare seq, ack to the keys already in sessiondb
+            add=0
+            for keys in sessiondb:
+                #if there are matching sequence or ack numbers
+                if curr_seq in keys or curr_ack in keys:
+                    sessiondb[(curr_seq,curr_ack)] = sessiondb.pop(keys)
+                    sessiondb[(curr_seq,curr_ack)] += [packet_tup]
+                    stop = 3
+                    if logging:
+                        logger("Packet #"+str(x)+"\n"+str(sessiondb[(curr_seq,curr_ack)]))
+                        logger('Conversation added to: '+str((curr_seq,curr_ack))+'\n'+'Number of items in the conversation: '+str(len(sessiondb[(curr_seq,curr_ack)]))+'\n\n')
+                    add+=1
+                    break
+                #if the curr_seq or curr_ack is +1 of a current key pair
+                elif curr_seq-1 in keys or curr_ack-1 in keys:
+                    sessiondb[(curr_seq,curr_ack)] = sessiondb.pop(keys)
+                    sessiondb[(curr_seq,curr_ack)] += [packet_tup]
+                    stop = 4
+                    if logging:
+                        logger("Packet #"+str(x)+"\n"+str(sessiondb[(curr_seq,curr_ack)]))
+                        logger('Conversation added to: '+str((curr_seq,curr_ack))+'\n'+'Number of items in the conversation: '+str(len(sessiondb[(curr_seq,curr_ack)]))+'\n\n')
+                    add+=1
+                    break
+            #If none of the above, so not added yet this packet is in the conversation and we make a new one.
+            if add == 0:
+                sessiondb[curr_seq, curr_ack] = [packet_tup]
                 stop = 5
-                for conversation in sessiondb: #iterate over keys in session dictionary
-                    for packet_item in sessiondb[conversation]: #iterate over the packets within those packet_item.\
-                        session_seq, session_ack = getvalue(packet_item[1],'TCP','seq'),getvalue(packet_item[1],'TCP','ack')
-                        #if the syn number is the same as any in a session, or any ack in a session
-                        stop = 6
-                        if seq == session_seq or seq == session_ack:
-                            sessiondb[conversation].append(packet_tup)
-                            stop = 7
-                            break
-                        #if the ack number is the same as any in a session, or any ack in a session
-                        elif ack == session_seq or seq == session_ack:
-                            sessiondb[conversation].append(packet_tup)
-                            stop = 8
-                            break    
-                sessiondb[(getvalue(packet_tup[1],'TCP','seq'),getvalue(packet_tup[1],'TCP','ack'))] = [packet_tup]
-    except Exception as e:
-        print('Packet we are looking at '+str(packet_tup)+'\n')
-        print('Key for the conversation '+str(conversation)+'\n')
-        print('Should be a list of items assigned to the above key '+str(sessiondb[conversation])+'\n')
-        print('Current item from current conversation '+str(session_seq) + ' ' + str(session_ack)+'\n')
-        print('Packet number '+str(x-1)+'\n')
-        print('Stop '+str(stop)+'\n')
-        print(str(e))
+                if logging:
+                    logger("Packet #"+str(x)+"\n"+str(sessiondb[(curr_seq,curr_ack)]))
+                    logger('Conversation added to: '+str((curr_seq,curr_ack))+'\n'+'Number of items in the conversation: '+str(len(sessiondb[(curr_seq,curr_ack)])))
+        except Exception as e:
+                logger("Stopped @ packet#: "+str(x)+'\n')
+                logger(str(e))
+                return
     return sessiondb
 
+def logger(string):
+    with open('/Users/acroffee/Roffee/git/packet/log.txt','a+') as log:
+        log.write(string+'\n')
+
+def cleanlog():
+    
+
+see results
+def debugconv(sessiondb, end):
+    count = 0
+    for key in sessiondb:
+        if count == end:
+            break
+        logger(str(sessiondb[key])+'\n'+str(count))
+        count+=1
 
 
 
@@ -429,6 +440,7 @@ def main():
     #fileLocation = 'c:\\users\\aroffee\desktop\\tvp_8_19.pcap'
     #dont forget time_param for packetInterval, change time windows for occurances
     #mac ~/Roffee/
+    #packets = grabpackets('/Users/acroffee/Roffee/git/packet/spike.pcap')
     packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') #sys.arg[1]
     packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') #sys.arg[1]
     x_axis = packetInterval(packets,1)
@@ -443,3 +455,49 @@ def main():
     plt.show()
 
     
+
+
+
+def findtcpconversations-old(packets):
+    #breakpoint()
+    sessiondb={}
+    stop = 0
+    for x,packet_tup in enumerate(packets):
+        curr_seq, curr_ack = getvalue(packet_tup[1], 'TCP', 'seq'),getvalue(packet_tup[1], 'TCP', 'ack')
+        stop = 0
+        #1 if not tcp then pass the packet_tup
+        if 'TCP' not in getprotocols(packet_tup[1]):
+            stop = 1
+        #2 if the packet_tup is a SYN packet_tup(only), make a !!new session
+        elif TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN']:
+            stop = 2
+            sessiondb[(curr_seq,curr_ack)] = [packet_tup]
+            logger(str("Database length after run SYN only "+str(x)+": "+str(len(sessiondb[curr_seq, curr_ack]))))
+        #3 otherwise compare seq, ack to the keys already in sessiondb
+        else:
+            for keys in sessiondb:
+                logger(keys)
+                #if there are matching sequence or ack numbers
+                if curr_seq in keys or curr_ack in keys:
+                    sessiondb[(curr_seq,curr_ack)] = sessiondb.pop(keys)
+                    sessiondb[(curr_seq,curr_ack)].append(packet_tup)
+                    stop = 3
+                    break
+                #if the curr_seq or curr_ack is +1 of a current key pair
+                elif curr_seq-1 in keys or curr_ack-1 in keys:
+                    sessiondb[(curr_seq,curr_ack)] = sessiondb.pop(keys)
+                    sessiondb[(curr_seq,curr_ack)].append(packet_tup)
+                    stop = 4
+                    break
+                #otherwise we are in the middle of the conversation and we make a new one.
+                else:
+                    sessiondb[curr_seq, curr_ack] = [packet_tup]
+                    stop = 5
+                    break
+            logger(str("Database length after run "+str(x)+": "+str(len(sessiondb[curr_seq, curr_ack]))))
+        logger("stop: "+str(stop))
+    return sessiondb
+
+
+
+dict[newkey] = dict[oldkey]
