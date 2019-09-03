@@ -1,28 +1,95 @@
-import sys
-import dpkt 
-import matplotlib.pyplot as plt
-
-
 '''
-I need an interface to pull protocol layers out of packets, while @getprotocols() gets what is there I need
-to differentiate between traffic put in tunnels becuase there is a different source and destination IPs
-depending if we are on the gre layer or lower. This will start at the lowest layer and work back, since 
-someone will most often be interested in the bottom IP layer rather than GRE ip source and destination
+Filename: packetcap.py
+Author: Andrew Roffee
+Purpose: ...
 
-@see getprotocols(), used by getvalue to list the protocol layers in a packet_tup
-@see reverseindex()
-@see getprotolayer()
-@see getvalue()
+CLASSES 
+CLASS TCP_FLAGS - small class to interpret TCP flags returned from the dpkt TCP class
+
+METHODS 
+getprotocols() - recursive function to acquire the protocols layered within a packet, used by getvalue() to list the protocol layers in a packet_tup (returns a list of protocols)
+
+reverseindex() - used to tell getprotolater() how many layers to drill down to get the appropriate data (returns an integer index of the desired layer)
+
+getprotolayer() - returns the protocol object from dpkt desired out of the provided packet, this allows us to pull whatever protocol information from whatever packet we want
+
+getvalue() - sits on top of getprotolayer() and allows you to pull individual data fields out of dpkt classess housed inside a packet ex IP src address (returns dpkt class data fields)
+
+grabpackets() - used to pull the packet data and create the appropriate dpkt objects to encapulate the data. The different versions apply to the different file 
+formats that the dpkt class can interpret, so far one for pcap and one for pcapng files. (returns a list of dpkt objects)
+
+packetinterval() - this splits packets into groups based off the time interval provided to this method. For example, packets every 5 minutes for the duration of the capture, every
+minute, second etc, the time period is a parameter so it is fully customizeable. Direct helper function for gettcpflagcounts() (returns a list of packet numbers(type int) which define the 
+boundaries of the time slice provided to the function)
+
+gettcpflagcounts() - this function reads the packets split into their time intervals by packetinterval() and then counts the apprioriate number of packets the the desired flag type included,
+this returns a list of counts of the specific flag type for each interval
+
+findtcpconversations() - this method reads a list of packets from @grabpackets() file and then pulls out all the different tcp conversations and returns them in a time ordered list
+
 
 Epoch time calculation (just going to do per interval)
 January 1, 1970, 00:00:00 UTC
 packetcap.py
 '''
 
+import sys
+import dpkt 
+import matplotlib.pyplot as plt
+
+
+'''
+This TCP_FLAGS class can be used to determine flags names from raw packet_tup data returned from the above
+@see getvalue() called with the TCP protocoltype and the flags data_field
+'''
+
+class TCP_FLAGS:
+    def __init__(self,bits):
+        self.bits = bits
+        self.flagname = self.getname(bits)
+    def getname(self,binary):
+        setbits = [int(x) for x in bin(binary)[2:].zfill(5)]
+        final = []
+        if setbits[4] and setbits[4] == 1:
+            final.append('FIN')
+        if setbits[3] and setbits[3] == 1:
+            final.append('SYN')
+        if setbits[2] and setbits[2] == 1:
+            final.append('RST')
+        if setbits[1] and setbits[1] == 1:
+            final.append('PSH')
+        if setbits[0] and setbits[0] == 1:
+            final.append('ACK')  
+        return final
+    def getflags(self,):
+        return self.flagname
+    def getbits(self,):
+        return self.bits
+
+
+#used for reading pcap files
+def grabpackets(fileLocation):
+    f = open(fileLocation,'rb')
+    pcap = dpkt.pcap.Reader(f)
+    ethli = []
+    for ts, buf in pcap:
+        ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
+    return ethli
+
+#used for reading pacpng files
+def grabpackets1(fileLocation):
+    f = open(fileLocation,'rb')
+    pcap = dpkt.pcapng.Reader(f)
+    ethli = []
+    for ts, buf in pcap:
+        ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
+    return ethli
+
+
 packetfields = {'ethernet':dpkt.ethernet.Ethernet,'tcp':dpkt.tcp.TCP,'ip':dpkt.ip.IP,'gre':dpkt.gre.GRE,\
 'icmp':dpkt.icmp.ICMP,'bgp':dpkt.bgp.BGP,'ipv6':dpkt.ip6.IP6}
 
-#get a list of all the protocols in the 
+#get a list of all the protocols in the, yes so far only 7 protocols are usable, this will expand as my usage expands.
 def getprotocols(packet):
     layers = []
     if isinstance(packet,packetfields['ethernet']):
@@ -87,54 +154,8 @@ def getvalue(packet, protocoltype, data_field):
     else:
         return 0
 
-'''
-This TCP_FLAGS class can be used to determine flags names from raw packet_tup data returned from the above
-@see getvalue() called with the TCP protocoltype and the flags data_field
-'''
-
-class TCP_FLAGS:
-    def __init__(self,bits):
-        self.bits = bits
-        self.flagname = self.getname(bits)
-    def getname(self,binary):
-        setbits = [int(x) for x in bin(binary)[2:].zfill(5)]
-        final = []
-        if setbits[4] and setbits[4] == 1:
-            final.append('FIN')
-        if setbits[3] and setbits[3] == 1:
-            final.append('SYN')
-        if setbits[2] and setbits[2] == 1:
-            final.append('RST')
-        if setbits[1] and setbits[1] == 1:
-            final.append('PSH')
-        if setbits[0] and setbits[0] == 1:
-            final.append('ACK')  
-        return final
-    def getflags(self,):
-        return self.flagname
-    def getbits(self,):
-        return self.bits
-
-
-#fileLocation = 'c:\\users\\aroffee\desktop\\tvp_8_19.pcap'
-def grabpackets(fileLocation):
-    f = open(fileLocation,'rb')
-    pcap = dpkt.pcap.Reader(f)
-    ethli = []
-    for ts, buf in pcap:
-        ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
-    return ethli
-
-def grabpackets1(fileLocation):
-    f = open(fileLocation,'rb')
-    pcap = dpkt.pcapng.Reader(f)
-    ethli = []
-    for ts, buf in pcap:
-        ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
-    return ethli
-
 #time_param is the number of interval in each slice
-def packetInterval(packetlist,time_param):
+def packetinterval(packetlist,time_param):
     deltaT = 0
     interval = [] #holds packet_tup number boundaries of each second
     for packetnumber in range(len(packetlist)-1):
@@ -144,12 +165,12 @@ def packetInterval(packetlist,time_param):
             deltaT = 0
     return interval
 
-#interval is output from packetInterval() in seconds so minutes =60, hours = 60^2 days = 60^2*24
-def getflagcounts(flagtype, packets, interval):
+#interval is output from packetinterval() in seconds so minutes =60, hours = 60^2 days = 60^2*24
+def gettcpflagcounts(packets, interval,flagtype='None'):
     count_per_interval = []
     start= 0
     total_for_current_interval = 0
-    #if we are looking for overall packet_tup count
+    #if we are looking for overall packet per interval count
     if flagtype == 'None':
         for number in interval:
             for packetsection in range(start,number):
@@ -161,9 +182,12 @@ def getflagcounts(flagtype, packets, interval):
     else: #if we are looking fo specific tcp flags
         for number in interval:
             for packetsection in range(start,number):
-                flags = TCP_FLAGS(packets[packetsection][1].data.data.flags)
-                if flagtype == flags.getflags():
-                    total_for_current_interval+=1
+                try:
+                    flags = TCP_FLAGS(getvalue(packets[packetsection][1],'TCP','flags'))
+                    if flagtype == flags.getflags():
+                        total_for_current_interval+=1
+                except:
+                    pass
             count_per_interval.append(total_for_current_interval)
             total_for_current_interval = 0
             start = number
@@ -172,13 +196,13 @@ def getflagcounts(flagtype, packets, interval):
 '''
 Method to parse tcp streams. Intersting note for later, the loop over the session keys is much more time efficient than the list version of this loop.
 Might be a good idea to look @ bigTheta for this for learning pruposes. 
-@see getvalue()
 
-'''  
+return an ordered list of tcp converstation, correlated by an dictionary, ordered by packet_tup no.
+packets are numbered already (packet_tup number, packet_tup data)
+breakpoint() - to use pydebug
+'''
 
-#return an ordered list of tcp converstation, correlated by an dictionary, ordered by packet_tup no.
-#packets are numbered already (packet_tup number, packet_tup data)
-#breakpoint() - to use pydebug
+
 def findtcpconversations(packets,logging = False):
     t = time.time()
     sessiondb={}
@@ -248,15 +272,13 @@ def logger(string):
     with open('/Users/acroffee/Roffee/git/data/log.txt','a+') as log:
         log.write(string+'\n')
 
-def debugconv(sessiondb, end):
-    count = 0
-    for key in sessiondb:
-        if count == end:
-            break
-        logger(str(sessiondb[key])+'\n'+str(count))
-        count+=1
+#takes seconds since the epoch and converts to local time
+def epochtolocal(timein):
+    return time.ctime(timein)
 
-
+#takes a time strucutre from time.ctime(decimal time)
+def epochtogmt(timein):
+    return time.strftime('%Y-%m-%d %H:%M:%SZ',timein)
 
 #get sequence number difference
 def seqdelta(num1,num2):
@@ -265,20 +287,21 @@ def seqdelta(num1,num2):
 
 def main():
     #fileLocation = 'c:\\users\\aroffee\desktop\\tvp_8_19.pcap'
-    #dont forget time_param for packetInterval, change time windows for occurances
+    #dont forget time_param for packetinterval, change time windows for occurances
     #mac ~/Roffee/
-    #packets = grabpackets('/Users/acroffee/Roffee/git/data/spike.pcap')
+    #   packets = grabpackets('/Users/acroffee/Roffee/git/data/spike.pcap')
     packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') #sys.arg[1]
     packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') #sys.arg[1]
-    x_axis = packetInterval(packets,1)
-    interval = len(packetInterval(packets)) 
+    x_axis = packetinterval(packets,1)
+    interval = len(packetinterval(packets)) 
     '''
     The idea here is to make sure that however we determine y_axis is dependent on x_axis, this keeps 
     the logic simple.
     '''
-    #y_axis = getflagcounts(['RST','ACK'],packets,x_axis) 
+    #y_axis = gettcpflagcounts(['RST','ACK'],packets,x_axis) 
     y_axis = 
     plt.plot(x_axis,y_axis)
+    plt.title.
     plt.show()
 
     
