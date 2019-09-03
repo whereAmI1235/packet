@@ -35,6 +35,7 @@ packetcap.py
 
 import sys
 import dpkt 
+import time
 import matplotlib.pyplot as plt
 
 
@@ -154,43 +155,32 @@ def getvalue(packet, protocoltype, data_field):
     else:
         return 0
 
-#time_param is the number of interval in each slice
-def packetinterval(packetlist,time_param):
-    deltaT = 0
-    interval = [] #holds packet_tup number boundaries of each second
-    for packetnumber in range(len(packetlist)-1):
-        deltaT += packetlist[packetnumber+1][0]-packetlist[packetnumber][0]
-        if deltaT>=time_param:
-            interval.append(packetnumber)#put the packet_tup number where the next second happens
-            deltaT = 0
+#returns the x_axis if we want a packets per a time frame
+def packetinterval(total_time,time_param):
+    interval = []
+    for time in range(0,int(total_time)+time_param,time_param):
+        interval.append(time)
     return interval
 
 #interval is output from packetinterval() in seconds so minutes =60, hours = 60^2 days = 60^2*24
 def gettcpflagcounts(packets, interval,flagtype='None'):
-    count_per_interval = []
-    start= 0
-    total_for_current_interval = 0
+    count_per_interval = [0]*len(interval[0])
+    start_time = packets[0][0]
     #if we are looking for overall packet per interval count
     if flagtype == 'None':
-        for number in interval:
-            for packetsection in range(start,number):
-                total_for_current_interval+=1
-            count_per_interval.append(total_for_current_interval)
-            total_for_current_interval = 0
-            start = number
+        for packet in packets:
+            time = packet[0] - start_time
+            count_per_interval[int(time/interval[1])]+=1
         return count_per_interval
     else: #if we are looking fo specific tcp flags
-        for number in interval:
-            for packetsection in range(start,number):
-                try:
-                    flags = TCP_FLAGS(getvalue(packets[packetsection][1],'TCP','flags'))
-                    if flagtype == flags.getflags():
-                        total_for_current_interval+=1
-                except:
-                    pass
-            count_per_interval.append(total_for_current_interval)
-            total_for_current_interval = 0
-            start = number
+        for packet in packets:
+            try:
+                time = packet[0] - start_time
+                flags = TCP_FLAGS(getvalue(packets[1],'TCP','flags'))
+                if flagtype == flags.getflags():
+                    count_per_interval[int(time/interval[1])]+=1
+            except:
+                pass
         return count_per_interval
 
 '''
@@ -280,6 +270,9 @@ def epochtolocal(timein):
 def epochtogmt(timein):
     return time.strftime('%Y-%m-%d %H:%M:%SZ',timein)
 
+def timedelta(time1, time2):
+    return time2 - time1
+
 #get sequence number difference
 def seqdelta(num1,num2):
     return -1*(num1-num2)  
@@ -292,18 +285,19 @@ def main():
     #   packets = grabpackets('/Users/acroffee/Roffee/git/data/spike.pcap')
     packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') #sys.arg[1]
     packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') #sys.arg[1]
-    x_axis = packetinterval(packets,1)
+    x_axis = packetinterval(timedelta(packets[0][0],packets[len(packets)-1][0]),60)
     interval = len(packetinterval(packets)) 
     '''
     The idea here is to make sure that however we determine y_axis is dependent on x_axis, this keeps 
     the logic simple.
     '''
-    #y_axis = gettcpflagcounts(['RST','ACK'],packets,x_axis) 
+    y_axis=gettcpflagcounts(packets, (packetinterval(timedelta(packets[0][0],packets[len(packets)-1][0]),60),60),flagtype='None')
+    y_axis = gettcpflagcounts(packets, x_axis, flagtype=['RST','ACK']) 
     y_axis = 
     plt.plot(x_axis,y_axis)
     plt.title.
     plt.show()
-
+    plt.show(block=plt1)#use block keyword to designate the .polt() list created with plt.plot(x,y)
     
 
 
