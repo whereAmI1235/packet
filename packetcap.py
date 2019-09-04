@@ -39,6 +39,7 @@ import sys
 import dpkt 
 import time
 import matplotlib.pyplot as plt
+import matplotlib.axis as axis
 
 
 '''
@@ -158,10 +159,11 @@ def getvalue(packet, protocoltype, data_field):
         return 0
 
 #returns the x_axis if we want a packets per a time frame
-def packetinterval(total_time,time_param):
+def packetinterval(start_end_time,time_param):
+    total_time = timedelta(start_end_time[0],start_end_time[1])
     interval = []
-    for time in range(0,int(total_time)+time_param,time_param):
-        interval.append(time)
+    for time_decimal in range(0,int(total_time)+time_param,time_param):
+        interval.append(epochtogmt(time.gmtime(start_end_time[0]+time_decimal)))
     return (interval,time_param)
 
 #interval is output from packetinterval() in seconds so minutes =60, hours = 60^2 days = 60^2*24
@@ -173,17 +175,16 @@ def gettcpflagcounts(packets, interval,flagtype='None'):
         for packet in packets:
             time = packet[0] - start_time
             count_per_interval[int(time/interval[1])]+=1
-        return count_per_interval
     else: #if we are looking fo specific tcp flags
         for packet in packets:
             try:
                 time = packet[0] - start_time
-                flags = TCP_FLAGS(getvalue(packets[1],'TCP','flags'))
-                if flagtype == flags.getflags():
+                flags = TCP_FLAGS(getvalue(packet[1],'TCP','flags')).getflags() #make sure this is packet not packets
+                if flagtype == flags:
                     count_per_interval[int(time/interval[1])]+=1
             except:
                 pass
-        return count_per_interval
+    return count_per_interval
 
 '''
 Method to parse tcp streams. Intersting note for later, the loop over the session keys is much more time efficient than the list version of this loop.
@@ -285,19 +286,31 @@ def main():
     #dont forget time_param for packetinterval, change time windows for occurances
     #mac ~/Roffee/
     #   packets = grabpackets('/Users/acroffee/Roffee/git/data/spike.pcap')
-    packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') #sys.arg[1]
-    packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') #sys.arg[1]
-    x_axis = packetinterval(timedelta(packets[0][0],packets[len(packets)-1][0]),60)
+    packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') 
+    packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') 
+    x_axis = packetinterval((packets[0][0],packets[len(packets)-1][0]),10)
     interval = len(packetinterval(packets)) 
+
     '''
     The idea here is to make sure that however we determine y_axis is dependent on x_axis, this keeps 
     the logic simple.
     '''
-    y_axis=gettcpflagcounts(packets, x_axis ,flagtype='None')
+    y_axis = gettcpflagcounts(packets, x_axis ,flagtype='None')
     y_axis = gettcpflagcounts(packets, x_axis, flagtype=['RST','ACK']) 
+    counted = 'Issue counted ie tcp flag types' #this will become a parameter or soemthing changed based off of user selection
     y_axis = 
-    plt.plot(x_axis,y_axis)
-    plt.title.
+
+plt.subplot #possibly use to manipulate axies and figure, not sure if there is an easier way yet https://matplotlib.org/api/_as_gen/matplotlib.pyplot.subplots.html#matplotlib.pyplot.subplots
+
+
+    plt.plot(x_axis[0],y_axis)
+    #change plot asthetics
+    plt.xlabel('Time in GMT')
+    plt.ylabel(counted)
+    plt.xticks(rotation=90,auto=True)
+    plt.title() #provide an overall graph title
+    plt.setp(axis.YAxis.axis_name='Time in GMT')#testing not sure how to use yet
+
     plt.show()
     plt.show(block=plt1)#use block keyword to designate the .polt() list created with plt.plot(x,y)
     
