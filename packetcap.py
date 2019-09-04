@@ -27,6 +27,8 @@ this returns a list of counts of the specific flag type for each interval
 
 findtcpconversations() - this method reads a list of packets from @grabpackets() file and then pulls out all the different tcp conversations and returns them in a time ordered list
 
+Current TODO:
+    Adjust the matplotlib plot so that timestamps are now represented on the x-axis, also change the title and other asthetics to make the graph more easily readable.
 
 Epoch time calculation (just going to do per interval)
 January 1, 1970, 00:00:00 UTC
@@ -160,7 +162,7 @@ def packetinterval(total_time,time_param):
     interval = []
     for time in range(0,int(total_time)+time_param,time_param):
         interval.append(time)
-    return interval
+    return (interval,time_param)
 
 #interval is output from packetinterval() in seconds so minutes =60, hours = 60^2 days = 60^2*24
 def gettcpflagcounts(packets, interval,flagtype='None'):
@@ -291,7 +293,7 @@ def main():
     The idea here is to make sure that however we determine y_axis is dependent on x_axis, this keeps 
     the logic simple.
     '''
-    y_axis=gettcpflagcounts(packets, (packetinterval(timedelta(packets[0][0],packets[len(packets)-1][0]),60),60),flagtype='None')
+    y_axis=gettcpflagcounts(packets, x_axis ,flagtype='None')
     y_axis = gettcpflagcounts(packets, x_axis, flagtype=['RST','ACK']) 
     y_axis = 
     plt.plot(x_axis,y_axis)
