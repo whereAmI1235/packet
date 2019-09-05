@@ -300,14 +300,15 @@ def main():
     counted = 'Issue counted ie tcp flag types' #this will become a parameter or soemthing changed based off of user selection
     y_axis = 
 
-plt.subplot #possibly use to manipulate axies and figure, not sure if there is an easier way yet https://matplotlib.org/api/_as_gen/matplotlib.pyplot.subplots.html#matplotlib.pyplot.subplots
+    plt.subplot #possibly use to manipulate axies and figure, not sure if there is an easier way yet https://matplotlib.org/api/_as_gen/matplotlib.pyplot.subplots.html#matplotlib.pyplot.subplots
 
 
     plt.plot(x_axis[0],y_axis)
     #change plot asthetics
     plt.xlabel('Time in GMT')
     plt.ylabel(counted)
-    plt.xticks(rotation=90,auto=True)
+    plt.xticks(rotation=90)
+    plt.Axes.set_autoscale_on(True)
     plt.title() #provide an overall graph title
     plt.setp(axis.YAxis.axis_name='Time in GMT')#testing not sure how to use yet
 
