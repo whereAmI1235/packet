@@ -28,7 +28,12 @@ this returns a list of counts of the specific flag type for each interval
 findtcpconversations() - this method reads a list of packets from @grabpackets() file and then pulls out all the different tcp conversations and returns them in a time ordered list
 
 Current TODO:
-    Adjust the matplotlib plot so that timestamps are now represented on the x-axis, also change the title and other asthetics to make the graph more easily readable.
+    Add some basic TCP analysis for the tcp seesions harvested from findtcpconversations()
+    Explore if more complexity in plotting trends is necessary for desired functionality, I suspect not
+
+Changes made:
+    TODO!!: add packet number so we can see what packet number it is in the packetlist. (to sessiondb)
+    Changed getvlaue() to return entire data_field to support pulltcpdatafromconversation and this TCP_UTIL TCP_SESSION 
 
 Epoch time calculation (just going to do per interval)
 January 1, 1970, 00:00:00 UTC
@@ -39,37 +44,7 @@ import sys
 import dpkt 
 import time
 import matplotlib.pyplot as plt
-import matplotlib.axis as axis
-
-
-'''
-This TCP_FLAGS class can be used to determine flags names from raw packet_tup data returned from the above
-@see getvalue() called with the TCP protocoltype and the flags data_field
-'''
-
-class TCP_FLAGS:
-    def __init__(self,bits):
-        self.bits = bits
-        self.flagname = self.getname(bits)
-    def getname(self,binary):
-        setbits = [int(x) for x in bin(binary)[2:].zfill(5)]
-        final = []
-        if setbits[4] and setbits[4] == 1:
-            final.append('FIN')
-        if setbits[3] and setbits[3] == 1:
-            final.append('SYN')
-        if setbits[2] and setbits[2] == 1:
-            final.append('RST')
-        if setbits[1] and setbits[1] == 1:
-            final.append('PSH')
-        if setbits[0] and setbits[0] == 1:
-            final.append('ACK')  
-        return final
-    def getflags(self,):
-        return self.flagname
-    def getbits(self,):
-        return self.bits
-
+from TCP_UTIL import *
 
 #used for reading pcap files
 def grabpackets(fileLocation):
@@ -141,7 +116,9 @@ def getprotolayer(packet_tup,layersdown):
 def getvalue(packet, protocoltype, data_field):
     avail_protocols = getprotocols(packet)
     layer = getprotolayer(packet,reverseindex(avail_protocols,protocoltype))
-    if data_field == 'src':
+    if data_field == None:#if none return the who protocol field and all its subfields
+        return layer
+    elif data_field == 'src':
         return layer.src
     elif data_field == 'dst':
         return layer.dst
@@ -155,6 +132,8 @@ def getvalue(packet, protocoltype, data_field):
         return layer.sport
     elif data_field == 'dport':
         return layer.dport
+    elif data_field == 'bytes':
+        return layer.data
     else:
         return 0
 
@@ -193,6 +172,7 @@ Might be a good idea to look @ bigTheta for this for learning pruposes.
 return an ordered list of tcp converstation, correlated by an dictionary, ordered by packet_tup no.
 packets are numbered already (packet_tup number, packet_tup data)
 breakpoint() - to use pydebug
+
 '''
 
 
@@ -209,10 +189,11 @@ def findtcpconversations(packets,logging = False):
                 stop = 1
                 continue
             curr_seq, curr_ack = getvalue(packet_tup[1], 'TCP', 'seq'),getvalue(packet_tup[1], 'TCP', 'ack')
+            packet_triple = (x,)+packet_tup
             #2 if the packet_tup is a SYN packet_tup(only), make a !!new session
             if TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN']:
                 stop = 2
-                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_tup]
+                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_triple]
                 stream_number+=1
                 if logging:
                     logger("Packet #"+str(x)+"\n"+str(sessiondb[(stream_number,curr_seq,curr_ack)])+'\n\n')
@@ -223,7 +204,7 @@ def findtcpconversations(packets,logging = False):
                 #if there are matching sequence or ack numbers, keys[0] is the stream_number, this will not change with additional packets
                 if curr_seq in keys[1:] or curr_ack in keys[1:]:
                     sessiondb[(keys[0],curr_seq,curr_ack)] = sessiondb.pop(keys)
-                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_tup]
+                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_triple]
                     stop = 3
                     if logging:
                         logger("Packet #"+str(x)+"\n"+str(sessiondb[(stream_number,curr_seq,curr_ack)]))
@@ -233,7 +214,7 @@ def findtcpconversations(packets,logging = False):
                 #if the curr_seq or curr_ack is +1 of a current key pair
                 elif curr_seq-1 in keys[1:] or curr_ack-1 in keys[1:]:
                     sessiondb[(keys[0],curr_seq,curr_ack)] = sessiondb.pop(keys)
-                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_tup]
+                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_triple]
                     stop = 4
                     if logging:
                         logger("Packet #"+str(x)+"\n"+str(sessiondb[(stream_number,curr_seq,curr_ack)]))
@@ -242,7 +223,7 @@ def findtcpconversations(packets,logging = False):
                     break
             #If none of the above, make a !!new session
             if add == 0:
-                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_tup]
+                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_triple]
                 stream_number+=1
                 stop = 5
                 if logging:
@@ -257,13 +238,21 @@ def findtcpconversations(packets,logging = False):
     for key in sessiondb:
         keylist.append(key)
     keylist.sort()
-    findb = [[x,sessiondb[x]] for x in keylist]
+    fin_db = [[x,sessiondb[x]] for x in keylist]
     print("Findtcpconversations took "+str(time.time()-t)+" seconds and "+str((time.time()-t)/60)+" minutes.")
-    return findb
+    return fin_db
 
 def logger(string):
     with open('/Users/acroffee/Roffee/git/data/log.txt','a+') as log:
         log.write(string+'\n')
+
+
+def pulltcpdatafromconversation(tcp_conversation):
+    tcp_convo = []
+    for packets in tcp_conversation:
+        tcp_portion = getvalue(packets[2],'TCP',None)
+        tcp_convo.append((packets[0],tcp_portion)) #packet number,tcp payload including header
+    return tcp_convo
 
 #takes seconds since the epoch and converts to local time
 def epochtolocal(timein):
@@ -276,9 +265,6 @@ def epochtogmt(timein):
 def timedelta(time1, time2):
     return time2 - time1
 
-#get sequence number difference
-def seqdelta(num1,num2):
-    return -1*(num1-num2)  
 
 
 def main():
@@ -301,14 +287,14 @@ def main():
     y_axis = 
 
     plt.subplot #possibly use to manipulate axies and figure, not sure if there is an easier way yet https://matplotlib.org/api/_as_gen/matplotlib.pyplot.subplots.html#matplotlib.pyplot.subplots
-
+    
 
     plt.plot(x_axis[0],y_axis)
     #change plot asthetics
     plt.xlabel('Time in GMT')
     plt.ylabel(counted)
     plt.xticks(rotation=90)
-    plt.Axes.set_autoscale_on(True)
+    plt.xticks.
     plt.title() #provide an overall graph title
     plt.setp(axis.YAxis.axis_name='Time in GMT')#testing not sure how to use yet
 
