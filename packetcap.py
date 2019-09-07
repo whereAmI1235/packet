@@ -32,7 +32,7 @@ Current TODO:
     Explore if more complexity in plotting trends is necessary for desired functionality, I suspect not
 
 Changes made:
-    TODO!!: add packet number so we can see what packet number it is in the packetlist. (to sessiondb)
+    Add packet number so we can see what packet number it is in the packetlist. (to sessiondb)
     Changed getvlaue() to return entire data_field to support pulltcpdatafromconversation and this TCP_UTIL TCP_SESSION 
 
 Epoch time calculation (just going to do per interval)
@@ -50,6 +50,7 @@ from TCP_UTIL import *
 def grabpackets(fileLocation):
     f = open(fileLocation,'rb')
     pcap = dpkt.pcap.Reader(f)
+    pcap.
     ethli = []
     for ts, buf in pcap:
         ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
@@ -67,6 +68,8 @@ def grabpackets1(fileLocation):
 
 packetfields = {'ethernet':dpkt.ethernet.Ethernet,'tcp':dpkt.tcp.TCP,'ip':dpkt.ip.IP,'gre':dpkt.gre.GRE,\
 'icmp':dpkt.icmp.ICMP,'bgp':dpkt.bgp.BGP,'ipv6':dpkt.ip6.IP6}
+
+headerlengths = {'ETHERNET':18,'GRE':4,'IP':20,'TCP':32,'IPV6':40,'BGP':19,'Bytes':0}
 
 #get a list of all the protocols in the, yes so far only 7 protocols are usable, this will expand as my usage expands.
 def getprotocols(packet):
@@ -134,6 +137,8 @@ def getvalue(packet, protocoltype, data_field):
         return layer.dport
     elif data_field == 'bytes':
         return layer.data
+    elif data_field == 'length':
+        return layer.len
     else:
         return 0
 
@@ -271,16 +276,17 @@ def main():
     #fileLocation = 'c:\\users\\aroffee\desktop\\tvp_8_19.pcap'
     #dont forget time_param for packetinterval, change time windows for occurances
     #mac ~/Roffee/
-    #   packets = grabpackets('/Users/acroffee/Roffee/git/data/spike.pcap')
-    packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') 
-    packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') 
+    packets = grabpackets('/Users/acroffee/Roffee/git/data/spike.pcap')
+    #packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') 
+    #packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') 
+    '''
     x_axis = packetinterval((packets[0][0],packets[len(packets)-1][0]),10)
     interval = len(packetinterval(packets)) 
 
-    '''
+
     The idea here is to make sure that however we determine y_axis is dependent on x_axis, this keeps 
     the logic simple.
-    '''
+
     y_axis = gettcpflagcounts(packets, x_axis ,flagtype='None')
     y_axis = gettcpflagcounts(packets, x_axis, flagtype=['RST','ACK']) 
     counted = 'Issue counted ie tcp flag types' #this will become a parameter or soemthing changed based off of user selection
@@ -300,6 +306,24 @@ def main():
 
     plt.show()
     plt.show(block=plt1)#use block keyword to designate the .polt() list created with plt.plot(x,y)
+
+[hex(x) for x in fileb[:24]], the global header of pcap file() first 24 bytes
+[hex(x) for x in fileb[24:24+16]], the first packet header where orig len is the last 4 bytes
+
+'''
+for packet in packets[:10]:
+    cols = getprotocols(packet[1])
+    print(cols)
+    for x,proto in enumerate(cols):
+        try:
+            print('TCP payload len should be: '+str(1522-sum([headerlengths[x] for x in cols])))
+            #print(proto+' header length is: '+str(len(getvalue(packet[1],cols[x],None))-len(getvalue(packet[1],cols[x+1],None))))
+        except:
+            pass
+    print('\n')
+
+    print(str(getprotocols(packet[1])))
+
     
 
 

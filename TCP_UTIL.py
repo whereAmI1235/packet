@@ -75,7 +75,7 @@ class TCP_SESSION:
         return s1,s2
     
     #now to implement tcp analysis
-    def
+    #def
 
 
 
@@ -84,4 +84,3 @@ def seqdelta(num1,num2):
     return -1*(num1-num2)  
 
 
-getoneway()
