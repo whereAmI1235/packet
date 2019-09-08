@@ -64,6 +64,52 @@ def grabpackets1(fileLocation):
         ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
     return ethli
 
+#returns a list of tuples containing the packet # and the size of the packet originally
+def getoriglen(file):
+    orginal_lengths = []
+    count = 0 
+    big = [161, 178, 60, 77] #right to left 
+    little = [77, 60, 178, 161] #left to right
+    B_end = False #is it little or big endian, determins which was we read bytes
+    file_byte = open(file,'rb').read()
+    file_iter = iter(file_byte)
+    #move past pcap header 24 bytes, determine how bytes should be read. l->r or r->l\
+    global_header = []
+    for x in range(24):
+        global_header.append(file_iter.__next__())
+    if global_header[:4]==big:
+        B_end = True
+    print("This file is bigendian: "+str(B_end))
+    print(global_header[:4])
+    #now we are at the first packet header, the original length will be kept here, 4th 4byte sesction, the amount captured will be the 4th, 4byte section
+    while True:
+        try:
+            tcp_header = []
+            for x in range(16):
+                tcp_header.append(file_iter.__next__())
+            cap_size = tcp_header[8:12]
+            orig_size =  tcp_header[12:16]
+            cap_size_int = getintfromhexl(cap_size, B_end)
+            orig_size_int = getintfromhexl(orig_size, B_end)
+            for x in range(cap_size_int):
+                file_iter.__next__()
+            '''
+            print('Packet number: '+str(count))
+            print('Cap size: '+str(cap_size_int))
+            print('Orig size: '+str(orig_size_int))
+            '''
+            orginal_lengths.append((count,orig_size_int)) #(packet #, original size of packet)
+            count+=1
+        except:
+            break
+    return orginal_lengths
+    
+#helper method to extract integer value from bytes represented in hex
+def getintfromhexl(hexL,bigend):
+    if bigend:
+        return int(hex((hexL[0]<<24|hexL[1]<<16|hexL[2]<<8|hexL[3])),16)
+    else: #if little end 
+        return int(hex((hexL[3]<<24|hexL[2]<<16|hexL[1]<<8|hexL[0])),16)
 
 packetfields = {'ethernet':dpkt.ethernet.Ethernet,'tcp':dpkt.tcp.TCP,'ip':dpkt.ip.IP,'gre':dpkt.gre.GRE,\
 'icmp':dpkt.icmp.ICMP,'bgp':dpkt.bgp.BGP,'ipv6':dpkt.ip6.IP6}
@@ -180,7 +226,7 @@ breakpoint() - to use pydebug
 '''
 
 
-def findtcpconversations(packets,logging = False):
+def gettcpconversations(packets,logging = False):
     t = time.time()
     sessiondb={}
     stop = 0
@@ -193,11 +239,11 @@ def findtcpconversations(packets,logging = False):
                 stop = 1
                 continue
             curr_seq, curr_ack = getvalue(packet_tup[1], 'TCP', 'seq'),getvalue(packet_tup[1], 'TCP', 'ack')
-            packet_triple = (x,)+packet_tup
+            packet_triples = (x,)+packet_tup
             #2 if the packet_tup is a SYN packet_tup(only), make a !!new session
             if TCP_FLAGS(getvalue(packet_tup[1], 'TCP', 'flags')).flagname == ['SYN']:
                 stop = 2
-                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_triple]
+                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_triples]
                 stream_number+=1
                 if logging:
                     logger("Packet #"+str(x)+"\n"+str(sessiondb[(stream_number,curr_seq,curr_ack)])+'\n\n')
@@ -208,7 +254,7 @@ def findtcpconversations(packets,logging = False):
                 #if there are matching sequence or ack numbers, keys[0] is the stream_number, this will not change with additional packets
                 if curr_seq in keys[1:] or curr_ack in keys[1:]:
                     sessiondb[(keys[0],curr_seq,curr_ack)] = sessiondb.pop(keys)
-                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_triple]
+                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_triples]
                     stop = 3
                     if logging:
                         logger("Packet #"+str(x)+"\n"+str(sessiondb[(stream_number,curr_seq,curr_ack)]))
@@ -218,7 +264,7 @@ def findtcpconversations(packets,logging = False):
                 #if the curr_seq or curr_ack is +1 of a current key pair
                 elif curr_seq-1 in keys[1:] or curr_ack-1 in keys[1:]:
                     sessiondb[(keys[0],curr_seq,curr_ack)] = sessiondb.pop(keys)
-                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_triple]
+                    sessiondb[(keys[0],curr_seq,curr_ack)] += [packet_triples]
                     stop = 4
                     if logging:
                         logger("Packet #"+str(x)+"\n"+str(sessiondb[(stream_number,curr_seq,curr_ack)]))
@@ -227,7 +273,7 @@ def findtcpconversations(packets,logging = False):
                     break
             #If none of the above, make a !!new session
             if add == 0:
-                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_triple]
+                sessiondb[(stream_number,curr_seq,curr_ack)] = [packet_triples]
                 stream_number+=1
                 stop = 5
                 if logging:
@@ -251,12 +297,13 @@ def logger(string):
         log.write(string+'\n')
 
 
+#tcp_conv[0] [key_info, conversation packets], tcp_conv[0][1] triples (packet#,timestamp,packetdata)
 def pulltcpdatafromconversation(tcp_conversation):
     tcp_convo = []
-    for packets in tcp_conversation:
-        tcp_portion = getvalue(packets[2],'TCP',None)
-        tcp_convo.append((packets[0],tcp_portion)) #packet number,tcp payload including header
-    return tcp_convo
+    for triples in tcp_conversation[1]:
+        tcp_portion = getvalue(triples[2],'TCP',None)
+        tcp_convo.append((triples[0],tcp_portion)) #packet number,tcp payload including header
+    return tcp_convo #@see getonewaysessions() in TCP_SESSION
 
 #takes seconds since the epoch and converts to local time
 def epochtolocal(timein):
@@ -275,9 +322,15 @@ def main():
     #fileLocation = 'c:\\users\\aroffee\desktop\\tvp_8_19.pcap'
     #dont forget time_param for packetinterval, change time windows for occurances
     #mac ~/Roffee/
-    packets = grabpackets('/Users/acroffee/Roffee/git/data/spike.pcap')
     #packets = grabpackets('c:\\users\\aroffee\desktop\\tvp_8_19.pcap') 
     #packets1 = grabpackets('c:\\users\\aroffee\desktop\\spike.pcap') 
+    file_path = '/Users/acroffee/Roffee/git/data/spike.pcap'
+    packets = grabpackets(file_path)
+    lengths = getoriglen(file_path)
+
+    gettcpconversations()
+
+
     '''
     x_axis = packetinterval((packets[0][0],packets[len(packets)-1][0]),10)
     interval = len(packetinterval(packets)) 
@@ -321,45 +374,7 @@ for packet in packets[:10]:
     print(str(getprotocols(packet[1])))
 '''
 
-def getoriglen(file):
-    orginal_lengths = []
-    count = 0 
-    big = [161, 178, 60, 77] #right to left 
-    little = [77, 60, 178, 161] #left to right
-    B_end = False #is it little or big endian, determins which was we read bytes
-    file_byte = open(file,'rb').read()
-    file_iter = iter(file_byte)
-    #move past pcap header 24 bytes, determine how bytes should be read. l->r or r->l\
-    global_header = []
-    for x in range(24):
-        global_header.append(file_iter.__next__())
-    if global_header[:4]==big:
-        B_end = True
-    print("This file is bigendian: "+str(B_end))
-    print(global_header[:4])
-    #now we are at the first packet header, the original length will be kept here, 4th 4byte sesction, the amount captured will be the 4th, 4byte section
-    count = 1
-    while True:
-        tcp_header = []
-        for x in range(16):
-            tcp_header.append(file_iter.__next__())
-        cap_size = tcp_header[8:12]
-        orig_size =  tcp_header[12:16]
-        tonext = getintfromhexl(cap_size, B_end)
-        orig_size_int = getintfromhexl(orig_size, B_end)
-        for x in range(tonext):
-            file_iter.__next__()
-        print('Packet number: '+str(count))
-        print('Cap size: '+str(tonext))
-        print('Orig size: '+str(orig_size_int))
-        count+=1
-    
-#helper method to extract 
-def getintfromhexl(hexL,bigend):
-    if bigend:
-        return int(hex((hexL[0]<<24|hexL[1]<<16|hexL[2]<<8|hexL[3])),16)
-    else: #if little end 
-        return int(hex((hexL[3]<<24|hexL[2]<<16|hexL[1]<<8|hexL[0])),16)
+
 
 
 

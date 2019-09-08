@@ -57,7 +57,6 @@ class TCP_FLAGS:
 #the list data will have the format of a list of tuples, (packet number, TCP tcp_payload)
 
 class TCP_SESSION:
-
     def __init__(self, conversation):
         self.conversation = conversation
         self.session1, self.session2 =  self.getonewaysessions(self.conversation)
@@ -66,16 +65,33 @@ class TCP_SESSION:
     def getonewaysessions(self, convo):
         s1 = []
         s2 = []
-        tcpside1 = (convo[0][1].sport,convo[0][1].dport)
+        sport1 = convo[0][1].sport
+        dport1 = convo[0][1].dport
         for tcp_payload in convo:
-            if tcpside1 == (tcp_payload[1].sport,tcp_payload[1].dport):
+            if sport1 == tcp_payload[1].sport and dport1 == tcp_payload[1].dport:
                 s1.append(tcp_payload)
             else:
                 s2.append(tcp_payload)
         return s1,s2
-    
+TODO: FIGURE OUT WHY PACKET 0 IS PUT IN WRONG CONVO!!!!!!
+    def __str__(self,):
+        ran = len(self.session1) if len(self.session1)>len(self.session2) else len(self.session2)
+        string_rep = 'Side1\t\t\t\tSide2\n'
+        for x in range(ran):
+            try:
+                string_rep+=str(self.session1[x][1].seq)+' '+str(self.session1[x][1].ack)+'\t'
+            except:
+                pass
+            try:
+                string_rep+=str(self.session2[x][1].seq)+' '+str(self.session2[x][1].ack)+'\n'
+            except:
+                pass
+        return string_rep
+
+
     #now to implement tcp analysis
     #def
+
 
 
 
