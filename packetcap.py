@@ -50,7 +50,6 @@ from TCP_UTIL import *
 def grabpackets(fileLocation):
     f = open(fileLocation,'rb')
     pcap = dpkt.pcap.Reader(f)
-    pcap.
     ethli = []
     for ts, buf in pcap:
         ethli.append((ts,dpkt.ethernet.Ethernet(buf)))
@@ -307,10 +306,7 @@ def main():
     plt.show()
     plt.show(block=plt1)#use block keyword to designate the .polt() list created with plt.plot(x,y)
 
-[hex(x) for x in fileb[:24]], the global header of pcap file() first 24 bytes
-[hex(x) for x in fileb[24:24+16]], the first packet header where orig len is the last 4 bytes
 
-'''
 for packet in packets[:10]:
     cols = getprotocols(packet[1])
     print(cols)
@@ -323,8 +319,48 @@ for packet in packets[:10]:
     print('\n')
 
     print(str(getprotocols(packet[1])))
+'''
 
+def getoriglen(file):
+    orginal_lengths = []
+    count = 0 
+    big = [161, 178, 60, 77] #right to left 
+    little = [77, 60, 178, 161] #left to right
+    B_end = False #is it little or big endian, determins which was we read bytes
+    file_byte = open(file,'rb').read()
+    file_iter = iter(file_byte)
+    #move past pcap header 24 bytes, determine how bytes should be read. l->r or r->l\
+    global_header = []
+    for x in range(24):
+        global_header.append(file_iter.__next__())
+    if global_header[:4]==big:
+        B_end = True
+    print("This file is bigendian: "+str(B_end))
+    print(global_header[:4])
+    #now we are at the first packet header, the original length will be kept here, 4th 4byte sesction, the amount captured will be the 4th, 4byte section
+    count = 1
+    while True:
+        tcp_header = []
+        for x in range(16):
+            tcp_header.append(file_iter.__next__())
+        cap_size = tcp_header[8:12]
+        orig_size =  tcp_header[12:16]
+        tonext = getintfromhexl(cap_size, B_end)
+        orig_size_int = getintfromhexl(orig_size, B_end)
+        for x in range(tonext):
+            file_iter.__next__()
+        print('Packet number: '+str(count))
+        print('Cap size: '+str(tonext))
+        print('Orig size: '+str(orig_size_int))
+        count+=1
     
+#helper method to extract 
+def getintfromhexl(hexL,bigend):
+    if bigend:
+        return int(hex((hexL[0]<<24|hexL[1]<<16|hexL[2]<<8|hexL[3])),16)
+    else: #if little end 
+        return int(hex((hexL[3]<<24|hexL[2]<<16|hexL[1]<<8|hexL[0])),16)
+
 
 
 
